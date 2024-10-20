@@ -3,7 +3,7 @@ A custom item plugin used by the Realm of Elderna Minecraft Server
 
 I do not reccomend you use this plugin, as it is very *not good* but if there is no other option, then feel free to use it. 
 
-The commands are as follows (by default only usable by players with administrator permissions: 
+The commands are as follows (by default only usable by players with administrator permissions): 
 
 /setlocation: Sets the target location to which players need to move in order to receive an item
 
