@@ -12,14 +12,14 @@
     <name>ItemAtLocation</name>
 
     <properties>
-        <java.version>17</java.version> <!-- Match the version of Paper you're using -->
+        <java.version>17</java.version> 
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.20.1-R0.1-SNAPSHOT</version> <!-- or a stable version like 1.20.1 -->
+            <version>1.20.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
