@@ -1,21 +1,13 @@
 name: ItemAtLocation
 main: com.example.ItemAtLocation.ItemAtLocation
-version: 1.0
+version: 1.1
 api-version: 1.20
-description: A plugin to reward players when they reach a specific location.
+description: A plugin to reward players when they reach specific locations.
 author: Wooldrum
 commands:
-  setlocation:
-    description: Sets the target location to the player's current position or specified coordinates.
-    usage: /setlocation <x> <y> <z>
-  setitem:
-    description: Sets the reward item.
-    usage: /setitem <item>
-  setcooldown:
-    description: Sets the cooldown time in seconds.
-    usage: /setcooldown <seconds>
-  removelocation:
-    description: Removes the current target location.
-    usage: /removelocation
+  itematlocation:
+    description: Main command for managing item at location tasks.
+    usage: /itematlocation <subcommand> [args]
+    aliases: [ial]
 depend: []
 softdepend: []
