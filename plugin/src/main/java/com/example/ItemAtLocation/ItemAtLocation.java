@@ -1,9 +1,11 @@
 package com.example.ItemAtLocation;
 
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.PluginCommand;
@@ -25,14 +27,13 @@ import java.util.stream.Collectors;
 public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor {
 
     private final Map<String, LocationData> locations = new HashMap<>();
-    private final HashMap<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Set<UUID> playersInRadius = new HashSet<>();
     private FileConfiguration locationsConfig;
     private File locationsFile;
 
     @Override
     public void onEnable() {
-        // Register main command
         PluginCommand command = this.getCommand("itematlocation");
         if (command == null) {
             getLogger().severe("Main command 'itematlocation' not found! Make sure it is defined in the plugin.yml.");
@@ -41,17 +42,12 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
             command.setTabCompleter(this);
         }
 
-        // Register event listener
         getServer().getPluginManager().registerEvents(this, this);
-
-        // Load locations configuration
         createLocationsConfig();
         loadLocationsFromConfig();
 
-        // Display startup message
-        Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "=================");
-        Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "Thanks for trying the ItemAtLocation Plugin! Report bugs at: https://discord.gg/btsRNtnv8M");
-        Bukkit.getConsoleSender().sendMessage(ChatColor.GOLD + "=================");
+        int pluginId = 23684;
+        new Metrics(this, pluginId);
 
         getLogger().info("ItemAtLocation plugin enabled.");
     }
@@ -66,41 +62,44 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         UUID playerUUID = player.getUniqueId();
+        Location playerLocation = player.getLocation();
         boolean isInAnyRadius = false;
 
         for (LocationData locationData : locations.values()) {
             Location targetLocation = locationData.getLocation();
-            if (targetLocation == null) continue;
+            if (targetLocation == null) {
+                continue;
+            }
 
-            // Check if player is within radius of the target location
-            Location playerLocation = player.getLocation();
-            if (playerLocation.distance(targetLocation) <= locationData.getRadius()) {
+            if (playerLocation.distanceSquared(targetLocation) <= Math.pow(locationData.getRadius(), 2)) {
                 isInAnyRadius = true;
 
-                // Check if the player is on cooldown
                 if (cooldowns.containsKey(playerUUID)) {
                     long lastReceived = cooldowns.get(playerUUID);
-                    if (System.currentTimeMillis() - lastReceived < locationData.getCooldownTime() * 1000L) {
+                    long timeSinceLast = System.currentTimeMillis() - lastReceived;
+                    if (timeSinceLast < locationData.getCooldownTime() * 1000L) {
                         if (!playersInRadius.contains(playerUUID)) {
-                            player.sendMessage(ChatColor.GOLD + "You are still on cooldown for this spot. Please wait " + ((locationData.getCooldownTime() * 1000L - (System.currentTimeMillis() - lastReceived)) / 1000) + " seconds.");
+                            long remainingTime = (locationData.getCooldownTime() * 1000L - timeSinceLast) / 1000;
+                            player.sendMessage(ChatColor.GOLD + "You are still on cooldown for this spot. Please wait " + remainingTime + " seconds.");
                             playersInRadius.add(playerUUID);
                         }
-                        continue; // Still on cooldown
+                        continue;
                     }
                 }
 
-                // Give the player the reward item
+                if (player.getInventory().firstEmpty() == -1) {
+                    player.sendMessage(ChatColor.RED + "Your inventory is full, so you can't receive the reward.");
+                    continue;
+                }
                 ItemStack itemStack = new ItemStack(locationData.getRewardItem(), 1);
                 player.getInventory().addItem(itemStack);
                 player.sendMessage(ChatColor.GOLD + "You have received: " + locationData.getRewardItem().name() + "!");
 
-                // Set cooldown
                 cooldowns.put(playerUUID, System.currentTimeMillis());
                 playersInRadius.add(playerUUID);
             }
         }
 
-        // Remove player from radius set if they are no longer in any radius
         if (!isInAnyRadius) {
             playersInRadius.remove(playerUUID);
         }
@@ -142,11 +141,11 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
                 return true;
 
             case "setitem":
-                if (args.length > 1) {
+                if (args.length == 3) {
+                    String locationName = args[1];
                     try {
-                        String locationName = args[1];
+                        Material rewardItem = Material.valueOf(args[2].toUpperCase());
                         if (locations.containsKey(locationName)) {
-                            Material rewardItem = Material.valueOf(args[2].toUpperCase());
                             locations.get(locationName).setRewardItem(rewardItem);
                             player.sendMessage(ChatColor.GOLD + "Reward item for location '" + locationName + "' set to: " + rewardItem.name());
                             saveLocationsToConfig();
@@ -162,9 +161,9 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
                 return true;
 
             case "setcooldown":
-                if (args.length > 2) {
+                if (args.length == 3) {
+                    String locationName = args[1];
                     try {
-                        String locationName = args[1];
                         int cooldownTime = Integer.parseInt(args[2]);
                         if (locations.containsKey(locationName)) {
                             locations.get(locationName).setCooldownTime(cooldownTime);
@@ -178,6 +177,26 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
                     }
                 } else {
                     player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation setcooldown <location> <seconds>");
+                }
+                return true;
+
+            case "setradius":
+                if (args.length == 3) {
+                    String locationName = args[1];
+                    try {
+                        double radius = Double.parseDouble(args[2]);
+                        if (locations.containsKey(locationName)) {
+                            locations.get(locationName).setRadius(radius);
+                            player.sendMessage(ChatColor.GOLD + "Radius for location '" + locationName + "' set to: " + radius + " blocks.");
+                            saveLocationsToConfig();
+                        } else {
+                            player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' not found.");
+                        }
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(ChatColor.GOLD + "Invalid radius. Please provide a valid number.");
+                    }
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation setradius <name> <radius>");
                 }
                 return true;
 
@@ -196,23 +215,75 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
                 }
                 return true;
 
-            case "setradius":
-                if (args.length > 2) {
-                    String name = args[1];
-                    try {
-                        double radius = Double.parseDouble(args[2]);
-                        if (locations.containsKey(name)) {
-                            locations.get(name).setRadius(radius);
-                            player.sendMessage(ChatColor.GOLD + "Radius for location '" + name + "' set to: " + radius + " blocks.");
-                            saveLocationsToConfig();
-                        } else {
-                            player.sendMessage(ChatColor.GOLD + "Location '" + name + "' not found.");
-                        }
-                    } catch (NumberFormatException e) {
-                        player.sendMessage(ChatColor.GOLD + "Invalid radius. Please provide a valid number.");
+            case "listlocations":
+                if (locations.isEmpty()) {
+                    player.sendMessage(ChatColor.GOLD + "No locations have been set.");
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Configured locations:");
+                    for (Map.Entry<String, LocationData> entry : locations.entrySet()) {
+                        LocationData locationData = entry.getValue();
+                        Location loc = locationData.getLocation();
+                        player.sendMessage(ChatColor.YELLOW + entry.getKey() + " - X=" + loc.getX() + " Y=" + loc.getY() + " Z=" + loc.getZ() + " | Item=" + locationData.getRewardItem().name() + " | Cooldown=" + locationData.getCooldownTime() + "s | Radius=" + locationData.getRadius() + " blocks");
+                    }
+                }
+                return true;
+
+            case "teleport":
+                if (args.length == 2) {
+                    String locationName = args[1];
+                    if (locations.containsKey(locationName)) {
+                        Location targetLocation = locations.get(locationName).getLocation();
+                        player.teleport(targetLocation);
+                        player.sendMessage(ChatColor.GOLD + "Teleported to location '" + locationName + "'.");
+                    } else {
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' not found.");
                     }
                 } else {
-                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation setradius <name> <radius>");
+                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation teleport <location>");
+                }
+                return true;
+
+            case "resetcooldown":
+                if (args.length == 2) {
+                    String locationName = args[1];
+                    if (locations.containsKey(locationName)) {
+                        cooldowns.remove(player.getUniqueId());
+                        player.sendMessage(ChatColor.GOLD + "Cooldown for location '" + locationName + "' has been reset.");
+                    } else {
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' not found.");
+                    }
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation resetcooldown <location>");
+                }
+                return true;
+
+            case "disablelocation":
+                if (args.length == 2) {
+                    String locationName = args[1];
+                    if (locations.containsKey(locationName)) {
+                        locations.get(locationName).setEnabled(false);
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' has been disabled.");
+                        saveLocationsToConfig();
+                    } else {
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' not found.");
+                    }
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation disablelocation <location>");
+                }
+                return true;
+
+            case "enablelocation":
+                if (args.length == 2) {
+                    String locationName = args[1];
+                    if (locations.containsKey(locationName)) {
+                        locations.get(locationName).setEnabled(true);
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' has been enabled.");
+                        saveLocationsToConfig();
+                    } else {
+                        player.sendMessage(ChatColor.GOLD + "Location '" + locationName + "' not found.");
+                    }
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Usage: /itematlocation enablelocation <location>");
                 }
                 return true;
 
@@ -229,17 +300,12 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
         }
 
         if (args.length == 1) {
-            return Arrays.asList("setlocation", "setitem", "setcooldown", "removelocation", "setradius").stream()
+            return Arrays.asList("setlocation", "setitem", "setcooldown", "setradius", "removelocation", "listlocations", "teleport", "resetcooldown", "disablelocation", "enablelocation").stream()
                     .filter(subcommand -> subcommand.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
-        } else if (args.length == 2 && (args[0].equalsIgnoreCase("setitem") || args[0].equalsIgnoreCase("setcooldown") || args[0].equalsIgnoreCase("removelocation") || args[0].equalsIgnoreCase("setradius"))) {
+        } else if (args.length == 2 && (args[0].equalsIgnoreCase("setitem") || args[0].equalsIgnoreCase("setcooldown") || args[0].equalsIgnoreCase("removelocation") || args[0].equalsIgnoreCase("setradius") || args[0].equalsIgnoreCase("teleport") || args[0].equalsIgnoreCase("resetcooldown") || args[0].equalsIgnoreCase("disablelocation") || args[0].equalsIgnoreCase("enablelocation"))) {
             return new ArrayList<>(locations.keySet()).stream()
                     .filter(name -> name.startsWith(args[1].toLowerCase()))
-                    .collect(Collectors.toList());
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("setitem")) {
-            return Arrays.stream(Material.values())
-                    .map(Material::name)
-                    .filter(name -> name.startsWith(args[2].toUpperCase()))
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();
@@ -252,7 +318,6 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
             try {
                 locationsFile.createNewFile();
                 locationsConfig = YamlConfiguration.loadConfiguration(locationsFile);
-                // Add welcome message with usage cases
                 locationsConfig.set("_welcome", "Welcome to the ItemAtLocation configuration file!");
                 locationsConfig.set("_usage", "Use this file to configure saved locations, including their coordinates, reward items, cooldown times, and radii.");
                 saveLocationsToConfig();
@@ -265,17 +330,23 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
 
     private void loadLocationsFromConfig() {
         for (String key : locationsConfig.getKeys(false)) {
-            if (key.startsWith("_")) continue; // Skip welcome/usage keys
+            if (key.startsWith("_")) continue;
             String worldName = locationsConfig.getString(key + ".world");
+            World world = Bukkit.getWorld(worldName);
+            if (world == null) {
+                getLogger().severe("World " + worldName + " does not exist!");
+                continue;
+            }
             double x = locationsConfig.getDouble(key + ".x");
             double y = locationsConfig.getDouble(key + ".y");
             double z = locationsConfig.getDouble(key + ".z");
             Material rewardItem = Material.valueOf(locationsConfig.getString(key + ".rewardItem"));
             int cooldownTime = locationsConfig.getInt(key + ".cooldownTime");
             double radius = locationsConfig.getDouble(key + ".radius");
+            boolean enabled = locationsConfig.getBoolean(key + ".enabled", true);
 
-            Location location = new Location(Bukkit.getWorld(worldName), x, y, z);
-            locations.put(key, new LocationData(location, rewardItem, cooldownTime, radius));
+            Location location = new Location(world, x, y, z);
+            locations.put(key, new LocationData(location, rewardItem, cooldownTime, radius, enabled));
         }
     }
 
@@ -290,6 +361,7 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
             locationsConfig.set(key + ".rewardItem", locationData.getRewardItem().name());
             locationsConfig.set(key + ".cooldownTime", locationData.getCooldownTime());
             locationsConfig.set(key + ".radius", locationData.getRadius());
+            locationsConfig.set(key + ".enabled", locationData.isEnabled());
         }
         try {
             locationsConfig.save(locationsFile);
@@ -299,16 +371,22 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
     }
 
     private static class LocationData {
-        private Location location;
+        private final Location location;
         private Material rewardItem;
         private int cooldownTime;
         private double radius;
+        private boolean enabled;
 
         public LocationData(Location location, Material rewardItem, int cooldownTime, double radius) {
+            this(location, rewardItem, cooldownTime, radius, true);
+        }
+
+        public LocationData(Location location, Material rewardItem, int cooldownTime, double radius, boolean enabled) {
             this.location = location;
             this.rewardItem = rewardItem;
             this.cooldownTime = cooldownTime;
             this.radius = radius;
+            this.enabled = enabled;
         }
 
         public Location getLocation() {
@@ -337,6 +415,14 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
 
         public void setRadius(double radius) {
             this.radius = radius;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 }
