@@ -34,6 +34,10 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
 
     @Override
     public void onEnable() {
+        getLogger().info(ChatColor.GOLD + "\n===========================================================\n"
+                         + ChatColor.GOLD + "Thank you for using the ItemAtLocation Plugin! Report bugs at: discord.gg/invite/btsRNtnv8M\n"
+                         + ChatColor.GOLD + "===========================================================");
+        
         PluginCommand command = this.getCommand("itematlocation");
         if (command == null) {
             getLogger().severe("Main command 'itematlocation' not found! Make sure it is defined in the plugin.yml.");
@@ -49,13 +53,13 @@ public class ItemAtLocation extends JavaPlugin implements Listener, TabExecutor 
         int pluginId = 23684;
         new Metrics(this, pluginId);
 
-        getLogger().info("ItemAtLocation plugin enabled.");
+        getLogger().info(ChatColor.GOLD + "ItemAtLocation plugin enabled.");
     }
 
     @Override
     public void onDisable() {
         saveLocationsToConfig();
-        getLogger().info("ItemAtLocation plugin disabled.");
+        getLogger().info(ChatColor.GOLD + "ItemAtLocation plugin disabled.");
     }
 
     @EventHandler
