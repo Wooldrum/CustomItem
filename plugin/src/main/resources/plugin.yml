@@ -1,13 +1,15 @@
 name: ItemAtLocation
 main: com.example.ItemAtLocation.ItemAtLocation
-version: 1.1
+version: 1.2-RELEASE
 api-version: 1.20
-description: A plugin to reward players when they reach specific locations.
+description: A plugin to give players an item when they reach specific locations.
 author: Wooldrum
 commands:
   itematlocation:
     description: Main command for managing item at location tasks.
     usage: /itematlocation <subcommand> [args]
-    aliases: [ial]
+    aliases:
+      - ial
+      - giveitem
 depend: []
 softdepend: []
