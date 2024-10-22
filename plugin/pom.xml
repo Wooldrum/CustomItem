@@ -6,11 +6,11 @@
 
     <groupId>com.wooldrum</groupId>
     <artifactId>ItemAtLocation</artifactId>
-    <version>1.2-RELEASE</version>
+    <version>1.3-RELEASE</version>
     <packaging>jar</packaging>
 
     <name>ItemAtLocation</name>
-    <description>A plugin to reward players when they reach specific locations</description>
+    <description>A plugin to give players an item when they reach specific locations!</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -39,7 +39,7 @@
     </dependencies>
 
     <build>
-        <finalName>ItemAtLocation-1.2-RELEASE</finalName>
+        <finalName>ItemAtLocation-1.3-RELEASE</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
